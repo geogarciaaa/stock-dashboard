@@ -259,6 +259,7 @@
 <script>
   const ALPACA_KEY = 'PKDOJEVFXBDNXUCLMNEJJKIRWF';
   const ALPACA_SECRET = 'HYfGqPN35g6rfST7Y4zGJGqxNtT47oGG2K6cZuZMR1uB';
+  const HEADERS = { 'APCA-API-KEY-ID': ALPACA_KEY, 'APCA-API-SECRET-KEY': ALPACA_SECRET };
 
   const WATCHLIST = [
     { symbol: 'SPY', name: 'S&P 500 ETF' },
@@ -280,11 +281,11 @@
 
   async function fetchQuote(symbol) {
     try {
-      const r = await fetch(`https://data.alpaca.markets/v2/stocks/${symbol}/quotes/latest?feed=iex`, {
-        headers: { 'APCA-API-KEY-ID': ALPACA_KEY, 'APCA-API-SECRET-KEY': ALPACA_SECRET }
+      const r = await fetch(`https://data.alpaca.markets/v2/stocks/${symbol}/bars/latest?feed=iex`, {
+        headers: HEADERS
       });
       const d = await r.json();
-      return d.quote ? (d.quote.ap + d.quote.bp) / 2 : null;
+      return d.bar ? d.bar.c : null;
     } catch { return null; }
   }
 
@@ -300,7 +301,7 @@
 
     try {
       const r = await fetch(`https://data.alpaca.markets/v2/stocks/${symbol}/bars?start=${start.toISOString()}&end=${now.toISOString()}&timeframe=${timeframe}&feed=iex&limit=200`, {
-        headers: { 'APCA-API-KEY-ID': ALPACA_KEY, 'APCA-API-SECRET-KEY': ALPACA_SECRET }
+        headers: HEADERS
       });
       const d = await r.json();
       return d.bars || [];
@@ -455,29 +456,36 @@
       </div>`).join('');
   }
 
-  function buildNews() {
-    const headlines = [
-      { title: 'Fed signals potential rate cut amid cooling inflation data', time: '2h ago', source: 'Reuters', url: 'https://www.reuters.com/markets/us/fed-rate-cut-signals/' },
-      { title: 'Tech stocks rally as AI spending outlook improves for 2026', time: '3h ago', source: 'Bloomberg', url: 'https://www.bloomberg.com/markets' },
-      { title: 'Oil prices steady as Middle East tensions ease slightly', time: '4h ago', source: 'WSJ', url: 'https://www.wsj.com/market-data' },
-      { title: 'S&P 500 closes near record highs for third straight session', time: '5h ago', source: 'CNBC', url: 'https://www.cnbc.com/markets/' },
-      { title: 'Earnings season kicks off with mixed results from major banks', time: '6h ago', source: 'FT', url: 'https://www.ft.com/markets' },
-      { title: 'Nvidia shares surge on strong data center demand report', time: '7h ago', source: 'Reuters', url: 'https://www.reuters.com/technology/' },
-    ];
-    document.getElementById('news-list').innerHTML = headlines.map(n => `
-      <a class="news-item" href="${n.url}" target="_blank" rel="noopener">
-        <div class="news-title">${n.title}</div>
-        <div class="news-meta">
-          <span class="news-source">${n.source}</span>
-          ${n.time}
-        </div>
-      </a>`).join('');
+  async function buildNews() {
+    try {
+      const r = await fetch(`https://data.alpaca.markets/v1beta1/news?limit=6`, { headers: HEADERS });
+      const d = await r.json();
+      const items = d.news || [];
+
+      document.getElementById('news-list').innerHTML = items.map(n => {
+        const time = new Date(n.created_at);
+        const now = new Date();
+        const diff = Math.floor((now - time) / 60000);
+        const timeStr = diff < 60 ? diff + 'm ago' : Math.floor(diff/60) + 'h ago';
+        const source = n.source || 'News';
+        return `
+          <a class="news-item" href="${n.url}" target="_blank" rel="noopener">
+            <div class="news-title">${n.headline}</div>
+            <div class="news-meta">
+              <span class="news-source">${source}</span>
+              ${timeStr}
+            </div>
+          </a>`;
+      }).join('');
+    } catch(e) {
+      document.getElementById('news-list').innerHTML = '<div class="loading">Could not load news</div>';
+    }
   }
 
   async function init() {
     await buildSidebar();
     buildMovers();
-    buildNews();
+    await buildNews();
     await loadChart(currentSymbol, currentTf);
     // Refresh prices every 60 seconds
     setInterval(buildSidebar, 60000);
