@@ -161,22 +161,24 @@
       background: #fff;
       border: 1px solid #ede9ff;
       border-radius: 12px;
-      padding: 20px;
+      padding: 24px;
       box-shadow: 0 2px 8px rgba(124,58,237,0.05);
     }
 
-    .panel-title { font-size: 0.72rem; color: #aaa; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 16px; }
+    .panel-title { font-size: 0.72rem; color: #aaa; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 20px; }
 
-    .news-item { padding: 10px 0; border-bottom: 1px solid #f3f0ff; }
+    .news-item { padding: 14px 0; border-bottom: 1px solid #f3f0ff; text-decoration: none; display: block; transition: background 0.15s; border-radius: 6px; }
     .news-item:last-child { border-bottom: none; }
-    .news-item .news-title { font-size: 0.82rem; color: #1a1a2e; line-height: 1.4; margin-bottom: 4px; }
-    .news-item .news-meta { font-size: 0.72rem; color: #aaa; }
+    .news-item:hover .news-title { color: #7c3aed; }
+    .news-item .news-title { font-size: 0.875rem; color: #1a1a2e; line-height: 1.5; margin-bottom: 6px; font-weight: 500; }
+    .news-item .news-meta { font-size: 0.72rem; color: #aaa; display: flex; align-items: center; gap: 8px; }
+    .news-item .news-source { background: #f3f0ff; color: #7c3aed; padding: 2px 8px; border-radius: 10px; font-size: 0.68rem; font-weight: 600; }
 
     .movers-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 9px 0;
+      padding: 13px 0;
       border-bottom: 1px solid #f3f0ff;
     }
     .movers-item:last-child { border-bottom: none; }
@@ -455,17 +457,21 @@
 
   function buildNews() {
     const headlines = [
-      { title: 'Fed signals potential rate cut amid cooling inflation data', time: '2h ago', source: 'Reuters' },
-      { title: 'Tech stocks rally as AI spending outlook improves', time: '3h ago', source: 'Bloomberg' },
-      { title: 'Oil prices steady as Middle East tensions ease slightly', time: '4h ago', source: 'WSJ' },
-      { title: 'S&P 500 closes near record highs for third straight session', time: '5h ago', source: 'CNBC' },
-      { title: 'Earnings season kicks off with mixed results from major banks', time: '6h ago', source: 'FT' },
+      { title: 'Fed signals potential rate cut amid cooling inflation data', time: '2h ago', source: 'Reuters', url: 'https://www.reuters.com/markets/us/fed-rate-cut-signals/' },
+      { title: 'Tech stocks rally as AI spending outlook improves for 2026', time: '3h ago', source: 'Bloomberg', url: 'https://www.bloomberg.com/markets' },
+      { title: 'Oil prices steady as Middle East tensions ease slightly', time: '4h ago', source: 'WSJ', url: 'https://www.wsj.com/market-data' },
+      { title: 'S&P 500 closes near record highs for third straight session', time: '5h ago', source: 'CNBC', url: 'https://www.cnbc.com/markets/' },
+      { title: 'Earnings season kicks off with mixed results from major banks', time: '6h ago', source: 'FT', url: 'https://www.ft.com/markets' },
+      { title: 'Nvidia shares surge on strong data center demand report', time: '7h ago', source: 'Reuters', url: 'https://www.reuters.com/technology/' },
     ];
     document.getElementById('news-list').innerHTML = headlines.map(n => `
-      <div class="news-item">
+      <a class="news-item" href="${n.url}" target="_blank" rel="noopener">
         <div class="news-title">${n.title}</div>
-        <div class="news-meta">${n.source} · ${n.time}</div>
-      </div>`).join('');
+        <div class="news-meta">
+          <span class="news-source">${n.source}</span>
+          ${n.time}
+        </div>
+      </a>`).join('');
   }
 
   async function init() {
