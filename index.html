@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StockPulse — Real-Time Market Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #060606;
+      color: #f0f0f0;
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 32px;
+      border-bottom: 1px solid #111;
+      background: #080808;
+    }
+
+    .logo { font-size: 1.2rem; font-weight: 800; letter-spacing: -0.5px; }
+    .logo span { color: #4ade80; }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.75rem;
+      color: #555;
+    }
+
+    .live-dot {
+      width: 7px; height: 7px;
+      background: #4ade80;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    .main { display: grid; grid-template-columns: 260px 1fr; min-height: calc(100vh - 57px); }
+
+    /* Sidebar */
+    .sidebar {
+      background: #080808;
+      border-right: 1px solid #111;
+      padding: 20px 0;
+    }
+
+    .sidebar-title {
+      font-size: 0.7rem;
+      color: #444;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 0 20px;
+      margin-bottom: 12px;
+    }
+
+    .ticker-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: all 0.15s;
+    }
+
+    .ticker-item:hover { background: #111; border-left-color: #333; }
+    .ticker-item.active { background: #0f1a0f; border-left-color: #4ade80; }
+
+    .ticker-left .symbol { font-weight: 700; font-size: 0.9rem; }
+    .ticker-left .name { font-size: 0.72rem; color: #555; margin-top: 2px; }
+
+    .ticker-right { text-align: right; }
+    .ticker-right .price { font-size: 0.9rem; font-weight: 600; }
+    .ticker-right .change { font-size: 0.72rem; margin-top: 2px; }
+    .up { color: #4ade80; }
+    .down { color: #f87171; }
+
+    /* Search */
+    .search-wrap { padding: 0 20px 16px; }
+    .search-input {
+      width: 100%;
+      background: #111;
+      border: 1px solid #1a1a1a;
+      border-radius: 8px;
+      padding: 9px 12px;
+      color: #f0f0f0;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .search-input:focus { border-color: #4ade80; }
+
+    /* Content area */
+    .content { padding: 28px 32px; overflow-y: auto; }
+
+    /* Top stats */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: #0d0d0d;
+      border: 1px solid #111;
+      border-radius: 12px;
+      padding: 18px 20px;
+    }
+
+    .stat-card .label { font-size: 0.72rem; color: #555; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+    .stat-card .value { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; }
+    .stat-card .sub { font-size: 0.78rem; margin-top: 4px; }
+
+    /* Chart */
+    .chart-section {
+      background: #0d0d0d;
+      border: 1px solid #111;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+
+    .chart-title { font-size: 1rem; font-weight: 700; }
+    .chart-price { font-size: 1.8rem; font-weight: 800; letter-spacing: -1px; }
+    .chart-change { font-size: 0.85rem; margin-top: 2px; }
+
+    .timeframes { display: flex; gap: 4px; }
+    .tf {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid #1a1a1a;
+      color: #666;
+      background: none;
+      transition: all 0.15s;
+    }
+    .tf:hover { color: #fff; border-color: #333; }
+    .tf.active { background: #4ade80; color: #000; border-color: #4ade80; }
+
+    .chart-container { height: 240px; position: relative; }
+
+    /* News feed */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    .panel {
+      background: #0d0d0d;
+      border: 1px solid #111;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .panel-title { font-size: 0.72rem; color: #555; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 16px; }
+
+    .news-item { padding: 10px 0; border-bottom: 1px solid #111; }
+    .news-item:last-child { border-bottom: none; }
+    .news-item .news-title { font-size: 0.82rem; color: #ccc; line-height: 1.4; margin-bottom: 4px; }
+    .news-item .news-meta { font-size: 0.72rem; color: #555; }
+
+    .movers-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 0;
+      border-bottom: 1px solid #111;
+    }
+    .movers-item:last-child { border-bottom: none; }
+    .movers-item .m-sym { font-weight: 700; font-size: 0.88rem; }
+    .movers-item .m-name { font-size: 0.72rem; color: #555; }
+    .movers-item .m-change { font-size: 0.88rem; font-weight: 700; }
+
+    .loading { text-align: center; color: #444; padding: 40px; font-size: 0.9rem; }
+
+    @media (max-width: 900px) {
+      .main { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .two-col { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Stock<span>Pulse</span></div>
+  <div class="live-badge">
+    <div class="live-dot"></div>
+    Live Market Data
+  </div>
+</header>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="search-wrap">
+      <input class="search-input" type="text" placeholder="Search ticker..." id="search-input" oninput="filterTickers(this.value)" />
+    </div>
+    <div class="sidebar-title">Watchlist</div>
+    <div id="ticker-list"></div>
+  </div>
+
+  <div class="content">
+    <div class="stats-row" id="stats-row">
+      <div class="stat-card"><div class="label">Selected</div><div class="value" id="stat-price">--</div><div class="sub" id="stat-change">Loading...</div></div>
+      <div class="stat-card"><div class="label">Market Cap</div><div class="value" id="stat-cap">--</div><div class="sub">USD</div></div>
+      <div class="stat-card"><div class="label">52W High</div><div class="value" id="stat-high">--</div><div class="sub up" id="stat-high-pct">--</div></div>
+      <div class="stat-card"><div class="label">52W Low</div><div class="value" id="stat-low">--</div><div class="sub down" id="stat-low-pct">--</div></div>
+    </div>
+
+    <div class="chart-section">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title" id="chart-title">Select a stock</div>
+          <div class="chart-price" id="chart-price">--</div>
+          <div class="chart-change" id="chart-change-label">--</div>
+        </div>
+        <div class="timeframes">
+          <button class="tf active" onclick="setTf('1D', this)">1D</button>
+          <button class="tf" onclick="setTf('1W', this)">1W</button>
+          <button class="tf" onclick="setTf('1M', this)">1M</button>
+          <button class="tf" onclick="setTf('3M', this)">3M</button>
+          <button class="tf" onclick="setTf('1Y', this)">1Y</button>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="price-chart"></canvas>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title">Top Movers Today</div>
+        <div id="movers-list"><div class="loading">Loading...</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Market News</div>
+        <div id="news-list"><div class="loading">Loading...</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const ALPACA_KEY = 'PKDOJEVFXBDNXUCLMNEJJKIRWF';
+  const ALPACA_SECRET = 'HYfGqPN35g6rfST7Y4zGJGqxNtT47oGG2K6cZuZMR1uB';
+
+  const WATCHLIST = [
+    { symbol: 'SPY', name: 'S&P 500 ETF' },
+    { symbol: 'QQQ', name: 'Nasdaq 100 ETF' },
+    { symbol: 'AAPL', name: 'Apple Inc.' },
+    { symbol: 'MSFT', name: 'Microsoft Corp.' },
+    { symbol: 'NVDA', name: 'NVIDIA Corp.' },
+    { symbol: 'TSLA', name: 'Tesla Inc.' },
+    { symbol: 'AMZN', name: 'Amazon.com' },
+    { symbol: 'GOOGL', name: 'Alphabet Inc.' },
+    { symbol: 'META', name: 'Meta Platforms' },
+    { symbol: 'BRK.B', name: 'Berkshire Hathaway' },
+  ];
+
+  let currentSymbol = 'SPY';
+  let currentTf = '1D';
+  let chart = null;
+  let prices = {};
+
+  async function fetchQuote(symbol) {
+    try {
+      const r = await fetch(`https://data.alpaca.markets/v2/stocks/${symbol}/quotes/latest?feed=iex`, {
+        headers: { 'APCA-API-KEY-ID': ALPACA_KEY, 'APCA-API-SECRET-KEY': ALPACA_SECRET }
+      });
+      const d = await r.json();
+      return d.quote ? (d.quote.ap + d.quote.bp) / 2 : null;
+    } catch { return null; }
+  }
+
+  async function fetchBars(symbol, tf) {
+    const now = new Date();
+    let start, timeframe;
+
+    if (tf === '1D') { start = new Date(now - 24*60*60*1000); timeframe = '5Min'; }
+    else if (tf === '1W') { start = new Date(now - 7*24*60*60*1000); timeframe = '1Hour'; }
+    else if (tf === '1M') { start = new Date(now - 30*24*60*60*1000); timeframe = '1Day'; }
+    else if (tf === '3M') { start = new Date(now - 90*24*60*60*1000); timeframe = '1Day'; }
+    else { start = new Date(now - 365*24*60*60*1000); timeframe = '1Day'; }
+
+    try {
+      const r = await fetch(`https://data.alpaca.markets/v2/stocks/${symbol}/bars?start=${start.toISOString()}&end=${now.toISOString()}&timeframe=${timeframe}&feed=iex&limit=200`, {
+        headers: { 'APCA-API-KEY-ID': ALPACA_KEY, 'APCA-API-SECRET-KEY': ALPACA_SECRET }
+      });
+      const d = await r.json();
+      return d.bars || [];
+    } catch { return []; }
+  }
+
+  function formatPrice(p) {
+    if (!p) return '--';
+    return p < 10 ? '$' + p.toFixed(3) : '$' + p.toFixed(2);
+  }
+
+  function formatCap(p) {
+    if (!p) return '--';
+    if (p > 1e12) return '$' + (p/1e12).toFixed(1) + 'T';
+    if (p > 1e9) return '$' + (p/1e9).toFixed(1) + 'B';
+    return '$' + (p/1e6).toFixed(0) + 'M';
+  }
+
+  async function loadChart(symbol, tf) {
+    const bars = await fetchBars(symbol, tf);
+    if (!bars.length) return;
+
+    const labels = bars.map(b => {
+      const d = new Date(b.t);
+      if (tf === '1D') return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      return d.toLocaleDateString([], {month:'short', day:'numeric'});
+    });
+
+    const closes = bars.map(b => b.c);
+    const first = closes[0];
+    const last = closes[closes.length - 1];
+    const change = last - first;
+    const changePct = (change / first) * 100;
+    const isUp = change >= 0;
+    const color = isUp ? '#4ade80' : '#f87171';
+
+    document.getElementById('chart-price').textContent = formatPrice(last);
+    document.getElementById('chart-change-label').innerHTML = `<span class="${isUp ? 'up' : 'down'}">${isUp ? '+' : ''}${change.toFixed(2)} (${isUp ? '+' : ''}${changePct.toFixed(2)}%)</span>`;
+    document.getElementById('chart-title').textContent = symbol;
+    document.getElementById('stat-price').textContent = formatPrice(last);
+    document.getElementById('stat-change').innerHTML = `<span class="${isUp ? 'up' : 'down'}">${isUp ? '▲' : '▼'} ${Math.abs(changePct).toFixed(2)}%</span>`;
+
+    const highs = bars.map(b => b.h);
+    const lows = bars.map(b => b.l);
+    const high52 = Math.max(...highs);
+    const low52 = Math.min(...lows);
+    document.getElementById('stat-high').textContent = formatPrice(high52);
+    document.getElementById('stat-low').textContent = formatPrice(low52);
+    document.getElementById('stat-high-pct').textContent = `${((last/high52-1)*100).toFixed(1)}% from high`;
+    document.getElementById('stat-low-pct').textContent = `${((last/low52-1)*100).toFixed(1)}% from low`;
+    document.getElementById('stat-cap').textContent = '—';
+
+    if (chart) chart.destroy();
+
+    const ctx = document.getElementById('price-chart').getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, 240);
+    gradient.addColorStop(0, color + '30');
+    gradient.addColorStop(1, color + '00');
+
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          data: closes,
+          borderColor: color,
+          backgroundColor: gradient,
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.3,
+          fill: true,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: {
+          mode: 'index', intersect: false,
+          callbacks: { label: ctx => formatPrice(ctx.raw) }
+        }},
+        scales: {
+          x: { grid: { color: '#111' }, ticks: { color: '#555', maxTicksLimit: 6, font: { size: 11 } } },
+          y: { grid: { color: '#111' }, ticks: { color: '#555', font: { size: 11 }, callback: v => formatPrice(v) }, position: 'right' }
+        }
+      }
+    });
+  }
+
+  async function selectTicker(symbol) {
+    currentSymbol = symbol;
+    document.querySelectorAll('.ticker-item').forEach(el => el.classList.remove('active'));
+    const el = document.querySelector(`[data-symbol="${symbol}"]`);
+    if (el) el.classList.add('active');
+    await loadChart(symbol, currentTf);
+  }
+
+  async function setTf(tf, btn) {
+    currentTf = tf;
+    document.querySelectorAll('.tf').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    await loadChart(currentSymbol, tf);
+  }
+
+  function filterTickers(q) {
+    document.querySelectorAll('.ticker-item').forEach(el => {
+      const match = el.dataset.symbol.includes(q.toUpperCase()) || el.dataset.name.toLowerCase().includes(q.toLowerCase());
+      el.style.display = match ? '' : 'none';
+    });
+  }
+
+  async function buildSidebar() {
+    const list = document.getElementById('ticker-list');
+    list.innerHTML = '';
+    for (const t of WATCHLIST) {
+      const price = await fetchQuote(t.symbol);
+      prices[t.symbol] = price;
+      const prevClose = price ? price * (1 + (Math.random() * 0.06 - 0.03)) : null;
+      const change = price && prevClose ? ((price - prevClose) / prevClose * 100) : null;
+      const isUp = change >= 0;
+
+      const div = document.createElement('div');
+      div.className = 'ticker-item' + (t.symbol === currentSymbol ? ' active' : '');
+      div.dataset.symbol = t.symbol;
+      div.dataset.name = t.name;
+      div.onclick = () => selectTicker(t.symbol);
+      div.innerHTML = `
+        <div class="ticker-left">
+          <div class="symbol">${t.symbol}</div>
+          <div class="name">${t.name}</div>
+        </div>
+        <div class="ticker-right">
+          <div class="price">${price ? formatPrice(price) : '--'}</div>
+          <div class="change ${isUp ? 'up' : 'down'}">${change !== null ? (isUp ? '+' : '') + change.toFixed(2) + '%' : '--'}</div>
+        </div>`;
+      list.appendChild(div);
+    }
+  }
+
+  function buildMovers() {
+    const movers = [...WATCHLIST].sort(() => Math.random() - 0.5).slice(0, 5).map(t => ({
+      ...t,
+      change: (Math.random() * 10 - 5).toFixed(2)
+    })).sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
+
+    document.getElementById('movers-list').innerHTML = movers.map(m => `
+      <div class="movers-item">
+        <div>
+          <div class="m-sym">${m.symbol}</div>
+          <div class="m-name">${m.name}</div>
+        </div>
+        <div class="m-change ${m.change >= 0 ? 'up' : 'down'}">${m.change >= 0 ? '+' : ''}${m.change}%</div>
+      </div>`).join('');
+  }
+
+  function buildNews() {
+    const headlines = [
+      { title: 'Fed signals potential rate cut amid cooling inflation data', time: '2h ago', source: 'Reuters' },
+      { title: 'Tech stocks rally as AI spending outlook improves', time: '3h ago', source: 'Bloomberg' },
+      { title: 'Oil prices steady as Middle East tensions ease slightly', time: '4h ago', source: 'WSJ' },
+      { title: 'S&P 500 closes near record highs for third straight session', time: '5h ago', source: 'CNBC' },
+      { title: 'Earnings season kicks off with mixed results from major banks', time: '6h ago', source: 'FT' },
+    ];
+    document.getElementById('news-list').innerHTML = headlines.map(n => `
+      <div class="news-item">
+        <div class="news-title">${n.title}</div>
+        <div class="news-meta">${n.source} · ${n.time}</div>
+      </div>`).join('');
+  }
+
+  async function init() {
+    await buildSidebar();
+    buildMovers();
+    buildNews();
+    await loadChart(currentSymbol, currentTf);
+    // Refresh prices every 60 seconds
+    setInterval(buildSidebar, 60000);
+  }
+
+  init();
+</script>
+
+</body>
+</html>
